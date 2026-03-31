@@ -43,7 +43,7 @@ public static partial class SettingsMigrations
         var backupDir = Path.Combine(applicationPaths.DataPath, "SettingsBackup");
         Directory.CreateDirectory(backupDir);
         var dateNow = DateTime.Now;
-        var fileName = $"settings-server.v{version}.{dateNow.Year:D4}{dateNow.Month:D2}{dateNow.Day:D2}{dateNow.Hour:D2}{dateNow.Minute:D2}.json";
+        var fileName = $"settings-server.v{version}.{dateNow:yyyyMMddHHmm}.json";
         var backupFile = Path.Combine(backupDir, fileName);
         File.WriteAllText(backupFile, settings);
 
