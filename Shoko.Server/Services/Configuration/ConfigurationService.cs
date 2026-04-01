@@ -783,10 +783,11 @@ public partial class ConfigurationService : IConfigurationService
         if (_loadedConfigurations.GetValueOrDefault(info.ID) is TConfig config)
             return copy ? config.DeepClone() : config;
 
+        string json;
         if (info.Path is null || !File.Exists(info.Path))
         {
             config = New<TConfig>();
-            var json = SerializeInternal(config);
+            json = SerializeInternal(config);
             SaveInternal(info, json, config);
             var (token, errors) = ValidateInternal(info, json, config, loadValidation: true);
             config = DeserializeInternal<TConfig>(token.ToJson());
@@ -796,13 +797,20 @@ public partial class ConfigurationService : IConfigurationService
             return copy ? config.DeepClone() : config;
         }
 
+        var hasMigrated = false;
         lock (info)
         {
-            var json = File.ReadAllText(info.Path);
+            json = File.ReadAllText(info.Path);
             if (typeof(TConfig).IsAssignableTo(typeof(IConfigurationWithMigrations)))
-                json = (string)typeof(TConfig)
+            {
+                var migratedJson = (string)typeof(TConfig)
                     .GetMethod(nameof(IConfigurationWithMigrations.ApplyMigrations), BindingFlags.Public | BindingFlags.Static)!
                     .Invoke(null, [json, _applicationPaths])!;
+
+                hasMigrated = !string.Equals(json, migratedJson, StringComparison.Ordinal);
+                if (hasMigrated)
+                    json = migratedJson;
+            }
 
             EnsureSchemaExists(info);
 
@@ -812,8 +820,12 @@ public partial class ConfigurationService : IConfigurationService
 
             config = DeserializeInternal<TConfig>(token.ToJson());
             _loadedConfigurations[info.ID] = config;
-            return copy ? config.DeepClone() : config;
         }
+
+        if (hasMigrated)
+            SaveInternal<TConfig>(info, json);
+
+        return copy ? config.DeepClone() : config;
     }
 
     #endregion
